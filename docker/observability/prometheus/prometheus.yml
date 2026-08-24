@@ -1,0 +1,30 @@
+# Prometheus scrape configuration for the AI Software Engineering Assistant stack.
+# Scrapes the app + worker actuator Prometheus endpoints. When the apps run on
+# the host (from an IDE) rather than in compose, host.docker.internal resolves
+# to the host; when run under `--profile apps` the service names resolve.
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+  external_labels:
+    stack: aicodeassistant
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: aicodeassistant-app
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["app:8080", "host.docker.internal:8080"]
+        labels:
+          service: aicodeassistant-app
+    # Only one of the targets will be up depending on how the app is run;
+    # the other simply reports as down, which is expected.
+
+  - job_name: aicodeassistant-indexer-worker
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["indexer-worker:8081", "host.docker.internal:8081"]
+        labels:
+          service: aicodeassistant-indexer-worker

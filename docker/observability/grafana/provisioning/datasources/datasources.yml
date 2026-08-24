@@ -1,0 +1,36 @@
+apiVersion: 1
+
+# Auto-provisioned datasources so Grafana is usable the moment it boots — no
+# manual clicking. Prometheus (metrics), Loki (logs), Tempo (traces), with
+# trace-to-logs and metrics correlation wired via the correlationId/traceID.
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"traceId":"(\w+)"'
+          name: TraceID
+          url: '$${__value.raw}'
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+      serviceMap:
+        datasourceUid: Prometheus

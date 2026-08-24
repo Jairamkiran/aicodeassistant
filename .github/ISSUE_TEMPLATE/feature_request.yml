@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an enhancement or new capability
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? Who benefits?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the capability. Note any architectural impact (new module, event, port).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Related milestone
+      description: See docs/ROADMAP.md
+      options:
+        - "Unsure / not milestone-specific"
+        - "M1 Identity & Access"
+        - "M2 Security Platform"
+        - "M3 Repository Context"
+        - "M4 Indexing Worker & Saga"
+        - "M5 Retrieval"
+        - "M6 AI Orchestration"
+        - "M7 Repository Code Chat"
+        - "M8+ (later)"
+    validations:
+      required: false

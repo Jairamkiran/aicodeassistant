@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aicodeassistant-config
+  namespace: aicodeassistant
+  labels:
+    app.kubernetes.io/part-of: aicodeassistant
+# Non-secret configuration shared by the app and worker. Secrets (DB password,
+# JWT/crypto keys, GitHub OAuth) live in the Secret, never here.
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  AICODEASSISTANT_DB_URL: "jdbc:postgresql://postgres:5432/aicodeassistant"
+  AICODEASSISTANT_KAFKA_BOOTSTRAP: "kafka:9092"
+  AICODEASSISTANT_REDIS_HOST: "redis"
+  AICODEASSISTANT_OLLAMA_URL: "http://ollama:11434"
+  AICODEASSISTANT_OTLP_ENDPOINT: "http://tempo:4318/v1/traces"
+  AICODEASSISTANT_TRACE_SAMPLING: "0.1"

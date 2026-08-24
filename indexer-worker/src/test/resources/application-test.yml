@@ -1,0 +1,47 @@
+# Worker test profile: H2 + JPA enabled (the worker now has real JPA repositories
+# for index_jobs); Flyway off (Hibernate generates the schema); Kafka points at
+# the in-JVM embedded broker provided by @EmbeddedKafka. No Docker.
+spring:
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:h2:mem:worker-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+  flyway:
+    enabled: false
+  kafka:
+    # Point at the in-JVM broker started by @EmbeddedKafka.
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+aicodeassistant:
+  indexing:
+    lines-per-chunk: 60
+    overlap-lines: 10
+    max-file-bytes: 1000000
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      embedding-model: nomic-embed-text
+      dimension: 768
+
+management:
+  otlp:
+    tracing:
+      export:
+        enabled: false
+
+logging:
+  level:
+    root: WARN

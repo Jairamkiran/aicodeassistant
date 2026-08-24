@@ -1,0 +1,48 @@
+version: 2
+updates:
+  # Gradle dependencies (version catalog + module build files).
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      spring:
+        patterns:
+          - "org.springframework*"
+          - "io.spring*"
+      testing:
+        patterns:
+          - "org.testcontainers*"
+          - "org.junit*"
+          - "org.assertj*"
+          - "org.mockito*"
+    labels:
+      - dependencies
+
+  # GitHub Actions used in workflows.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+
+  # Base images in the two Dockerfiles.
+  - package-ecosystem: docker
+    directory: "/app"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - docker
+  - package-ecosystem: docker
+    directory: "/indexer-worker"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - docker

@@ -1,0 +1,272 @@
+# =============================================================================
+# AI Software Engineering Assistant app (modular monolith) — base configuration.
+#
+# Profiles:
+#   (default)  sane defaults; connects to localhost infra (docker-compose).
+#   local      developer overrides (verbose logging, devtools).
+#   test       used by @SpringBootTest slices; infra replaced by Testcontainers.
+#
+# Secrets are NEVER hard-coded: they come from environment variables with
+# development-only fallbacks. Production supplies them via K8s secrets (M15).
+# =============================================================================
+spring:
+  application:
+    name: aicodeassistant-app
+  profiles:
+    default: default
+
+  datasource:
+    url: ${AICODEASSISTANT_DB_URL:jdbc:postgresql://localhost:5432/aicodeassistant}
+    username: ${AICODEASSISTANT_DB_USER:aicodeassistant}
+    password: ${AICODEASSISTANT_DB_PASSWORD:aicodeassistant}
+    hikari:
+      pool-name: aicodeassistant-app-pool
+      maximum-pool-size: ${AICODEASSISTANT_DB_POOL_MAX:10}
+      minimum-idle: 2
+      connection-timeout: 10000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${AICODEASSISTANT_KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      group-id: aicodeassistant-app
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.jairam.aicodeassistant.*"
+
+  data:
+    redis:
+      host: ${AICODEASSISTANT_REDIS_HOST:localhost}
+      port: ${AICODEASSISTANT_REDIS_PORT:6379}
+      timeout: 2000ms
+
+# --- AI Software Engineering Assistant application-specific configuration ------------------------------
+aicodeassistant:
+  ai:
+    # Chat provider selection. Default is a LOCAL Ollama instance so the whole
+    # stack runs offline/free; set to 'openai' (+ an API key) to use OpenAI.
+    chat:
+      provider: ${AICODEASSISTANT_CHAT_PROVIDER:ollama}
+    ollama:
+      base-url: ${AICODEASSISTANT_OLLAMA_URL:http://localhost:11434}
+      chat-model: ${AICODEASSISTANT_OLLAMA_CHAT_MODEL:llama3.1}
+      embedding-model: ${AICODEASSISTANT_OLLAMA_EMBED_MODEL:nomic-embed-text}
+      # Must match the vector(N) column dimension in V8 (nomic-embed-text = 768).
+      dimension: ${AICODEASSISTANT_OLLAMA_EMBED_DIM:768}
+      connect-timeout: PT3S
+      read-timeout: PT60S
+    openai:
+      # Used only when chat.provider=openai. API key MUST come from a secret.
+      base-url: ${AICODEASSISTANT_OPENAI_URL:https://api.openai.com/v1}
+      api-key: ${AICODEASSISTANT_OPENAI_API_KEY:}
+      chat-model: ${AICODEASSISTANT_OPENAI_CHAT_MODEL:gpt-4o-mini}
+      connect-timeout: PT3S
+      read-timeout: PT60S
+  retrieval:
+    # Hybrid-search ranking tuning. Equal weights = classic unweighted RRF; raise
+    # lexical-weight for codebases dominated by exact identifiers.
+    rrf-k: ${AICODEASSISTANT_RETRIEVAL_RRF_K:60}
+    vector-weight: ${AICODEASSISTANT_RETRIEVAL_VECTOR_WEIGHT:1.0}
+    lexical-weight: ${AICODEASSISTANT_RETRIEVAL_LEXICAL_WEIGHT:1.0}
+  conversation:
+    # RAG chat tuning (Repository Code Chat).
+    retrieval-limit: ${AICODEASSISTANT_CHAT_RETRIEVAL_LIMIT:8}
+    memory-window-turns: ${AICODEASSISTANT_CHAT_MEMORY_TURNS:6}
+    context-char-budget: ${AICODEASSISTANT_CHAT_CONTEXT_BUDGET:12000}
+  codeintel:
+    # Structured AI code-review tuning (Code Intelligence).
+    review-retrieval-limit: ${AICODEASSISTANT_REVIEW_RETRIEVAL_LIMIT:12}
+    context-char-budget: ${AICODEASSISTANT_REVIEW_CONTEXT_BUDGET:14000}
+  iam:
+    auth:
+      # Token lifetimes. Access tokens are short-lived; refresh tokens long-lived
+      # and rotated on every use (family-based reuse detection).
+      access-token-ttl: ${AICODEASSISTANT_ACCESS_TOKEN_TTL:PT15M}
+      refresh-token-ttl: ${AICODEASSISTANT_REFRESH_TOKEN_TTL:P14D}
+      issuer: ${AICODEASSISTANT_JWT_ISSUER:aicodeassistant}
+      # HMAC signing secret — MUST be overridden in any real deployment. The dev
+      # default is >=32 bytes (HS256 minimum) and clearly non-production.
+      jwt-secret: ${AICODEASSISTANT_JWT_SECRET:dev-only-insecure-signing-secret-change-me-32b+}
+      refresh-cookie-name: ${AICODEASSISTANT_REFRESH_COOKIE_NAME:aicodeassistant_refresh}
+      # Secure=false for local HTTP dev; overridden to true in real deployments.
+      refresh-cookie-secure: ${AICODEASSISTANT_REFRESH_COOKIE_SECURE:false}
+      refresh-cookie-path: /api/v1/auth
+  crypto:
+    # Base64-encoded 256-bit AES key for encrypting provider tokens at rest.
+    # MUST be overridden via secret in any real deployment. Dev default is a
+    # fixed, clearly non-production 32-byte key.
+    key: ${AICODEASSISTANT_CRYPTO_KEY:ZGV2LW9ubHktYWVzMjU2LWtleS0wMDMyLWJ5dGVzISE=}
+  integration:
+    github:
+      # OAuth App credentials — supply via secret to link against real GitHub.
+      client-id: ${AICODEASSISTANT_GITHUB_CLIENT_ID:}
+      client-secret: ${AICODEASSISTANT_GITHUB_CLIENT_SECRET:}
+      redirect-uri: ${AICODEASSISTANT_GITHUB_REDIRECT_URI:http://localhost:8080/api/v1/integrations/github/callback}
+      api-base-url: ${AICODEASSISTANT_GITHUB_API_URL:https://api.github.com}
+      auth-base-url: ${AICODEASSISTANT_GITHUB_AUTH_URL:https://github.com/login/oauth}
+      connect-timeout: PT3S
+      read-timeout: PT10S
+
+# --- Resilience4j: circuit breaker + retry around external GitHub calls ------
+resilience4j:
+  circuitbreaker:
+    instances:
+      github:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 8
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        # Only transient failures count against the breaker; not-linked/credential
+        # rejections are caller/config errors, not GitHub being unhealthy.
+        record-exceptions:
+          - com.jairam.aicodeassistant.integration.github.GitHubException$Unavailable
+        ignore-exceptions:
+          - com.jairam.aicodeassistant.integration.github.GitHubException$NotLinked
+          - com.jairam.aicodeassistant.integration.github.GitHubException$CredentialRejected
+      ollama:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 8
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - com.jairam.aicodeassistant.ai.embedding.EmbeddingException
+      ollama-chat:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 8
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - com.jairam.aicodeassistant.ai.chat.ChatException$Unavailable
+      openai-chat:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 8
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        # Only transient failures trip the breaker; a rejected credential is a
+        # config error, not the provider being unhealthy.
+        record-exceptions:
+          - com.jairam.aicodeassistant.ai.chat.ChatException$Unavailable
+        ignore-exceptions:
+          - com.jairam.aicodeassistant.ai.chat.ChatException$CredentialRejected
+  retry:
+    instances:
+      github:
+        max-attempts: 3
+        wait-duration: 500ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        # Retry only transient failures; never retry auth/not-linked.
+        retry-exceptions:
+          - com.jairam.aicodeassistant.integration.github.GitHubException$Unavailable
+        ignore-exceptions:
+          - com.jairam.aicodeassistant.integration.github.GitHubException$NotLinked
+          - com.jairam.aicodeassistant.integration.github.GitHubException$CredentialRejected
+      ollama:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.jairam.aicodeassistant.ai.embedding.EmbeddingException
+      ollama-chat:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.jairam.aicodeassistant.ai.chat.ChatException$Unavailable
+      openai-chat:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        # Retry transient failures; never retry a rejected credential.
+        retry-exceptions:
+          - com.jairam.aicodeassistant.ai.chat.ChatException$Unavailable
+        ignore-exceptions:
+          - com.jairam.aicodeassistant.ai.chat.ChatException$CredentialRejected
+
+# --- Observability: metrics, tracing, health --------------------------------
+management:
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        retrieval.search: true
+        conversation.rag.answer: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,modulith
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  tracing:
+    sampling:
+      probability: ${AICODEASSISTANT_TRACE_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${AICODEASSISTANT_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# --- API documentation -------------------------------------------------------
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+server:
+  port: ${AICODEASSISTANT_APP_PORT:8080}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+logging:
+  level:
+    root: INFO
+    com.jairam.aicodeassistant: ${AICODEASSISTANT_LOG_LEVEL:INFO}

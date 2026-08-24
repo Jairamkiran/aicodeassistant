@@ -1,0 +1,109 @@
+# =============================================================================
+# AI Software Engineering Assistant indexer-worker — base configuration.
+#
+# Headless (non-web) deployable. Consumes Kafka topics and runs the indexing
+# saga. Shares infra endpoints with the app but uses its own consumer group.
+# =============================================================================
+spring:
+  application:
+    name: aicodeassistant-indexer-worker
+  # NOTE: this IS a servlet app, but it registers NO business controllers — its
+  # only HTTP surface is actuator (health/readiness/liveness + prometheus) for
+  # K8s probes and metrics scraping. It does NOT depend on :platform-web, so the
+  # RFC-9457 advice, springdoc, and the business web layer are absent.
+
+  datasource:
+    url: ${AICODEASSISTANT_DB_URL:jdbc:postgresql://localhost:5432/aicodeassistant}
+    username: ${AICODEASSISTANT_DB_USER:aicodeassistant}
+    password: ${AICODEASSISTANT_DB_PASSWORD:aicodeassistant}
+    hikari:
+      pool-name: aicodeassistant-worker-pool
+      maximum-pool-size: ${AICODEASSISTANT_WORKER_DB_POOL_MAX:8}
+      minimum-idle: 1
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The app owns and runs the Flyway migrations; the worker validates against
+      # the already-migrated schema (deploy ordering: app migrates, then worker).
+      ddl-auto: validate
+  flyway:
+    enabled: false
+
+  kafka:
+    bootstrap-servers: ${AICODEASSISTANT_KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: aicodeassistant-indexer-worker
+      # Payloads are consumed as raw JSON strings and parsed explicitly by the
+      # listener (decoupled from producer classes), so both sides are Strings.
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: manual
+
+aicodeassistant:
+  indexing:
+    lines-per-chunk: ${AICODEASSISTANT_CHUNK_LINES:60}
+    overlap-lines: ${AICODEASSISTANT_CHUNK_OVERLAP:10}
+    max-file-bytes: ${AICODEASSISTANT_MAX_FILE_BYTES:1000000}
+  ai:
+    ollama:
+      base-url: ${AICODEASSISTANT_OLLAMA_URL:http://localhost:11434}
+      embedding-model: ${AICODEASSISTANT_OLLAMA_EMBED_MODEL:nomic-embed-text}
+      dimension: ${AICODEASSISTANT_OLLAMA_EMBED_DIM:768}
+      connect-timeout: PT3S
+      read-timeout: PT30S
+
+# Resilience around the Ollama embedding calls (see EmbeddingClient @Retry/@CircuitBreaker).
+resilience4j:
+  circuitbreaker:
+    instances:
+      ollama:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 8
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-exceptions:
+          - com.jairam.aicodeassistant.ai.embedding.EmbeddingException
+  retry:
+    instances:
+      ollama:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.jairam.aicodeassistant.ai.embedding.EmbeddingException
+
+server:
+  port: ${AICODEASSISTANT_WORKER_PORT:8081}
+  shutdown: graceful
+
+management:
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  otlp:
+    tracing:
+      endpoint: ${AICODEASSISTANT_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  level:
+    root: INFO
+    com.jairam.aicodeassistant: ${AICODEASSISTANT_LOG_LEVEL:INFO}

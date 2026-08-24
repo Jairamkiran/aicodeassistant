@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<ruleset name="AI Software Engineering Assistant PMD rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>
+    Focused static-analysis ruleset for real defect categories. Formatting and
+    style are owned by Spotless (google-java-format) and Checkstyle, so PMD does
+    NOT duplicate them; it targets error-prone constructs and a few high-signal
+    best practices. Rules that fight idiomatic Spring/DDD code (e.g. law of Demeter,
+    god-class heuristics on aggregates) are intentionally excluded.
+  </description>
+
+  <!-- Likely bugs: the highest-value category, minus rules that clash with our
+       idioms (records/DTOs, deliberately-lazy streaming resources handled via
+       Stream.onClose, and instanceof-in-catch used to re-throw domain errors). -->
+  <rule ref="category/java/errorprone.xml">
+    <exclude name="AvoidLiteralsInIfCondition"/>
+    <exclude name="AvoidDuplicateLiterals"/>
+    <exclude name="AvoidFieldNameMatchingMethodName"/>
+    <exclude name="CompareObjectsWithEquals"/>
+    <!-- Streaming adapters return a Stream that owns the HTTP body and is closed
+         via Stream.onClose(); PMD cannot see that ownership transfer. -->
+    <exclude name="CloseResource"/>
+    <!-- We deliberately re-throw already-typed domain exceptions from a single
+         catch using an instanceof guard; splitting catches would duplicate code. -->
+    <exclude name="AvoidInstanceofChecksInCatchClause"/>
+    <!-- Missing-branch/serialisation heuristics produce noise on our records. -->
+    <exclude name="MissingSerialVersionUID"/>
+    <!-- Clearing an optional/nullable field to null (e.g. statusDetail on a state
+         transition) is intentional and clearer than a sentinel. -->
+    <exclude name="NullAssignment"/>
+    <!-- Package-private DTO holder classes that group provider records are a
+         deliberate namespacing device, not meant to be instantiated. -->
+    <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
+  </rule>
+
+  <!-- A curated subset of best-practices that catch genuine mistakes. PMD's
+       unused-* rules mis-detect method references (e.g. Class::method) as unused,
+       so we rely on javac -Werror + Checkstyle for unused symbols instead and
+       keep only the loop/resource best-practices here. -->
+  <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+  <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
+
+  <!-- Multithreading correctness for our async/streaming code. -->
+  <rule ref="category/java/multithreading.xml/DoubleCheckedLocking"/>
+  <rule ref="category/java/multithreading.xml/UnsynchronizedStaticFormatter"/>
+
+</ruleset>

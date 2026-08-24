@@ -1,0 +1,20 @@
+# Repository-module test profile: H2 with Hibernate schema generation, no Docker.
+spring:
+  datasource:
+    url: jdbc:h2:mem:repo-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+  flyway:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.jairam.aicodeassistant.repository: INFO

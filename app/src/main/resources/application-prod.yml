@@ -1,0 +1,63 @@
+# =============================================================================
+# Production profile overrides (activate with SPRING_PROFILES_ACTIVE=prod).
+#
+# Everything here HARDENS the sane defaults in application.yml. Secrets still
+# come exclusively from the environment (K8s secrets); this file only tightens
+# behaviour, it never embeds a secret.
+# =============================================================================
+spring:
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        # No schema mutations in prod; Flyway owns the schema and JPA validates it.
+        format_sql: false
+  datasource:
+    hikari:
+      # Larger pool + tighter timeouts for a production workload; tune per load test.
+      maximum-pool-size: ${AICODEASSISTANT_DB_POOL_MAX:20}
+      minimum-idle: ${AICODEASSISTANT_DB_POOL_MIN:5}
+      connection-timeout: 5000
+      leak-detection-threshold: 30000
+
+server:
+  # Behind an ingress/reverse proxy: honour X-Forwarded-* for correct scheme/host.
+  forward-headers-strategy: framework
+  shutdown: graceful
+  tomcat:
+    threads:
+      max: ${AICODEASSISTANT_TOMCAT_MAX_THREADS:200}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+# Graceful shutdown so in-flight requests/SSE streams drain on rollout.
+lifecycle:
+  timeout-per-shutdown-phase: 25s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Lock down the actuator surface in prod: health + prometheus scrape only.
+        # Metrics/modulith/env introspection are not exposed to the public port.
+        include: health,info,prometheus
+  endpoint:
+    health:
+      # Never leak internal component details to unauthenticated callers in prod.
+      show-details: never
+  tracing:
+    sampling:
+      # Sample a fraction of traces in prod to bound overhead/cost.
+      probability: ${AICODEASSISTANT_TRACE_SAMPLING:0.1}
+
+aicodeassistant:
+  iam:
+    auth:
+      # The refresh cookie MUST be Secure in production (HTTPS only).
+      refresh-cookie-secure: true
+
+logging:
+  level:
+    root: INFO
+    com.jairam.aicodeassistant: INFO

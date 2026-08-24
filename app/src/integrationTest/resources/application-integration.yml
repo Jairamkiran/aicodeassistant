@@ -1,0 +1,23 @@
+# Integration-test profile. Unlike the 'test' profile, infra auto-config is
+# ENABLED — datasource/JPA/Flyway/Kafka connect to live Testcontainers whose
+# connection details are injected via @DynamicPropertySource.
+spring:
+  main:
+    banner-mode: off
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  otlp:
+    tracing:
+      export:
+        enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.jairam.aicodeassistant: INFO
+    org.testcontainers: INFO

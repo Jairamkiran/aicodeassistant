@@ -1,0 +1,45 @@
+# --- Gradle ---
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+**/build/
+
+# --- IDE ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+out/
+bin/
+
+# --- Java ---
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# --- Node / frontend (added in M8) ---
+node_modules/
+dist/
+*.local
+.env
+.env.*
+!.env.example
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Secrets / local config ---
+*.pem
+*.key
+secrets/
+application-local.yml
+
+# --- Docker / data volumes ---
+.data/
+docker/volumes/

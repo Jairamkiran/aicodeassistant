@@ -1,0 +1,59 @@
+# Test profile for unit-scope context loading WITHOUT external infrastructure.
+#
+# Uses an in-memory H2 database (PostgreSQL compatibility mode) with Hibernate
+# schema generation so the FULL context — including JPA repositories and the
+# security layer — wires and boots offline. Flyway is disabled here (its
+# migrations are Postgres-specific and validated by the Testcontainers
+# integration tests). Kafka/Redis auto-config remain excluded; the outbox event
+# registry is exercised in integration scope.
+spring:
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:h2:mem:aicodeassistant-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      # Modulith event externalization is integration-tested (needs Kafka +
+      # serializer); disable the registry/relay in unit scope so the context
+      # boots on H2 alone. In-process @ApplicationModuleListener events still work.
+      - org.springframework.modulith.events.kafka.KafkaEventExternalizerConfiguration
+      - org.springframework.modulith.events.kafka.KafkaJacksonConfiguration
+      - org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration
+      - org.springframework.modulith.events.jpa.archiving.ArchivingAutoConfiguration
+
+# Deterministic, non-production auth settings for tests.
+aicodeassistant:
+  iam:
+    auth:
+      access-token-ttl: PT15M
+      refresh-token-ttl: P14D
+      issuer: aicodeassistant-test
+      jwt-secret: test-only-signing-secret-at-least-32-bytes-long!!
+      refresh-cookie-name: aicodeassistant_refresh
+      refresh-cookie-secure: false
+      refresh-cookie-path: /api/v1/auth
+
+management:
+  otlp:
+    tracing:
+      export:
+        enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.jairam.aicodeassistant: INFO

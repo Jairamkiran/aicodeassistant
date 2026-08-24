@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: aicodeassistant
+  labels:
+    app.kubernetes.io/name: app
+    app.kubernetes.io/part-of: aicodeassistant
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app
+        app.kubernetes.io/part-of: aicodeassistant
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: ghcr.io/jairamkiran/aicodeassistant-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aicodeassistant-config
+          env:
+            - name: AICODEASSISTANT_DB_USER
+              valueFrom:
+                secretKeyRef: { name: aicodeassistant-secrets, key: AICODEASSISTANT_DB_USER }
+            - name: AICODEASSISTANT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: aicodeassistant-secrets, key: AICODEASSISTANT_DB_PASSWORD }
+            - name: AICODEASSISTANT_JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: aicodeassistant-secrets, key: AICODEASSISTANT_JWT_SECRET }
+            - name: AICODEASSISTANT_CRYPTO_KEY
+              valueFrom:
+                secretKeyRef: { name: aicodeassistant-secrets, key: AICODEASSISTANT_CRYPTO_KEY }
+            - name: AICODEASSISTANT_GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef: { name: aicodeassistant-secrets, key: AICODEASSISTANT_GITHUB_CLIENT_ID }
+            - name: AICODEASSISTANT_GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: aicodeassistant-secrets, key: AICODEASSISTANT_GITHUB_CLIENT_SECRET }
+            - name: AICODEASSISTANT_REFRESH_COOKIE_SECURE
+              value: "true"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "768Mi"
+            limits:
+              memory: "1536Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  namespace: aicodeassistant
+  labels:
+    app.kubernetes.io/name: app
+    app.kubernetes.io/part-of: aicodeassistant
+spec:
+  selector:
+    app.kubernetes.io/name: app
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

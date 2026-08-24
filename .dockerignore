@@ -1,0 +1,16 @@
+# Build outputs (rebuilt inside the image)
+**/build/
+.gradle/
+# IDE / VCS
+.idea/
+.vscode/
+.git/
+**/*.iml
+# Node (frontend, added M8)
+**/node_modules/
+frontend/dist/
+# Docs / local data
+docs/
+.data/
+*.md
+!README.md

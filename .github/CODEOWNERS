@@ -1,0 +1,18 @@
+# Code owners — automatically requested for review on matching paths.
+
+# Default owner for everything.
+*                       @Jairamkiran
+
+# Build & CI
+/buildSrc/              @Jairamkiran
+/.github/               @Jairamkiran
+*.gradle.kts            @Jairamkiran
+/gradle/                @Jairamkiran
+
+# Architecture & decisions
+/docs/                  @Jairamkiran
+/docs/adr/              @Jairamkiran
+
+# Shared kernels — high blast radius, review carefully
+/platform/              @Jairamkiran
+/platform-web/          @Jairamkiran

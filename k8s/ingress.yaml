@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aicodeassistant
+  namespace: aicodeassistant
+  labels:
+    app.kubernetes.io/part-of: aicodeassistant
+  annotations:
+    # SSE (chat streaming) must not be buffered by the ingress proxy.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: aicodeassistant.example.com
+      http:
+        paths:
+          # API goes to the backend app.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: app
+                port:
+                  number: 8080
+          # Everything else is the SPA.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - aicodeassistant.example.com
+      secretName: aicodeassistant-tls

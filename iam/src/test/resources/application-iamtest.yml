@@ -1,0 +1,42 @@
+# Test profile for iam end-to-end tests: full stack (JPA + security + web) on an
+# in-memory H2 database with Hibernate-generated schema, so the complete auth
+# flow runs offline without Docker. Real-Postgres validation of the same schema
+# is covered by the Testcontainers integration test.
+spring:
+  datasource:
+    url: jdbc:h2:mem:iam-e2e;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+  flyway:
+    enabled: false
+  # No Redis in unit-scope tests; disabling auto-config avoids a client trying to
+  # connect to localhost:6379. Rate limiting falls back to the no-op limiter.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+
+aicodeassistant:
+  ratelimit:
+    enabled: false
+  iam:
+    auth:
+      access-token-ttl: PT15M
+      refresh-token-ttl: P14D
+      issuer: aicodeassistant-iam-test
+      jwt-secret: iam-e2e-signing-secret-at-least-32-bytes-long!!
+      refresh-cookie-name: aicodeassistant_refresh
+      refresh-cookie-secure: false
+      refresh-cookie-path: /api/v1/auth
+
+logging:
+  level:
+    root: WARN
+    com.jairam.aicodeassistant.iam: INFO
