@@ -7,7 +7,7 @@
 # =============================================================================
 
 # --- build stage -------------------------------------------------------------
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM eclipse-temurin:22-jdk-jammy AS build
 WORKDIR /workspace
 
 COPY gradlew settings.gradle.kts build.gradle.kts ./
@@ -23,7 +23,7 @@ RUN mkdir -p /workspace/extracted && \
     java -Djarmode=layertools -jar indexer-worker/build/libs/*.jar extract --destination /workspace/extracted
 
 # --- runtime stage -----------------------------------------------------------
-FROM eclipse-temurin:21-jre-jammy AS runtime
+FROM eclipse-temurin:22-jre-jammy AS runtime
 WORKDIR /app
 
 RUN apt-get update && \
