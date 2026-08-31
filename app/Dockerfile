@@ -7,7 +7,7 @@
 # =============================================================================
 
 # --- build stage -------------------------------------------------------------
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM eclipse-temurin:25-jdk-jammy AS build
 WORKDIR /workspace
 
 # Copy build definitions first for better layer caching of dependencies.
@@ -26,7 +26,7 @@ RUN mkdir -p /workspace/extracted && \
     java -Djarmode=layertools -jar app/build/libs/*.jar extract --destination /workspace/extracted
 
 # --- runtime stage -----------------------------------------------------------
-FROM eclipse-temurin:21-jre-jammy AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 WORKDIR /app
 
 # Run as a non-root user for security.
